@@ -1,0 +1,26 @@
+{
+  "name": "smart-wallet-js",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "mocha --timeout 15000"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "axios": "^0.16.1",
+    "lodash": "^4.17.4",
+    "sjcl": "git+https://github.com/stellar/sjcl.git",
+    "sjcl-scrypt": "git+https://github.com/stellar/sjcl-scrypt.git",
+    "stellar-sdk": "git+https://github.com/atticlab/smart-sdk-js.git",
+    "tweetnacl": "^1.0.0-rc.1",
+    "tweetnacl-util": "^0.15.0"
+  },
+  "devDependencies": {
+    "chai": "^3.5.0",
+    "chai-as-promised": "^6.0.0",
+    "mocha": "^3.2.0"
+  }
+}
