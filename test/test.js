@@ -68,4 +68,18 @@ describe('Wallets', function () {
             })
             .should.eventually.be.instanceof(wallet);
     });
+
+    it('createTotp', function () {
+        let phone = getRandomInt(380000000000, 389999999999).toString();
+        let accountKeypair = StellarSdk.Keypair.random();
+        let password = '12312x3';
+
+        return WalletApi.create({
+            keypair: accountKeypair,
+            password: password,
+            phone: phone,
+        }).then(wallet => {
+            return wallet.enableTotp();
+        })
+    })
 });

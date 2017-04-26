@@ -41,12 +41,20 @@ module.exports = class extends EventEmitter {
         this.axios.defaults.paramsSerializer = function (params) {
             return Qs.stringify(params, {arrayFormat: 'brackets'})
         }
+
         this.axios.interceptors.request.use(function (config) {
             if (self.options.debug) {
                 config.headers['Debug'] = true;
             }
 
             return config;
+        });
+
+        self.axios.interceptors.response.use(function (response) {
+            return response.data;
+        }, function (error) {
+            // TODO: error handling
+            return Promise.reject(error);
         });
     }
 
@@ -61,7 +69,7 @@ module.exports = class extends EventEmitter {
             throw new Error('password is not set');
         }
 
-        if (!params.keypair instanceof StellarSdk.Keypair){
+        if (!params.keypair instanceof StellarSdk.Keypair) {
             throw new Error('keypair must be an instanceof StellarSdk.Keypair');
         }
 
@@ -143,8 +151,8 @@ module.exports = class extends EventEmitter {
 
         return this.axios.get('/index/getkdf')
             .then(function (resp) {
-                cached_kdf_params = resp.data;
-                params.kdf_params = resp.data;
+                cached_kdf_params = resp;
+                params.kdf_params = resp;
 
                 return Promise.resolve(params);
             })
@@ -157,9 +165,9 @@ module.exports = class extends EventEmitter {
 
         return this.axios.post('/wallets/getdata', _.pick(params, ['email', 'phone']))
             .then(function (resp) {
-                params.salt = resp.data.salt;
-                params.account_id = resp.data.account_id
-                params.kdf_params = resp.data.kdf_params;
+                params.salt = resp.salt;
+                params.account_id = resp.account_id
+                params.kdf_params = resp.kdf_params;
 
                 return Promise.resolve(params);
             })
@@ -207,11 +215,12 @@ module.exports = class extends EventEmitter {
                 return self.axios.post('/wallets/get', _.pick(params, [
                         'account_id',
                         'wallet_id',
+                        'tfa_code'
                     ]))
                     .then(function (resp) {
-                        params.keychain_data = resp.data.keychain_data;
-                        params.email = resp.data.email;
-                        params.phone = resp.data.phone;
+                        params.keychain_data = resp.keychain_data;
+                        params.email = resp.email;
+                        params.phone = resp.phone;
 
                         self.emit(EVENT_PROCESS, {
                             func: 'decryptWallet',

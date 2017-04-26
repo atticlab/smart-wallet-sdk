@@ -30,6 +30,20 @@ class Wallet {
         this.api = api;
     }
 
+    getNonce() {
+        return this.api.axios.post('/auth/createnonce', _.pick(this, ['account_id']))
+    }
+
+    enableTotp() {
+        return this.getNonce()
+            .then(nonce => {
+                return this.api.axios.post('/auth/enableTotp', {
+                    nonce: nonce,
+                    signature: this.sign(nonce),
+                });
+            })
+    }
+
     sign(message) {
         if (!_.isString(message)) {
             throw new TypeError('message must be a String.');
