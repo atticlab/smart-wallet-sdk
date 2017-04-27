@@ -41,6 +41,8 @@ class Helpers {
 
                 return new Promise(resolve => {
                     setTimeout(() => {
+                        cb();
+
                         resolve(params)
                     }, 100);
                 });

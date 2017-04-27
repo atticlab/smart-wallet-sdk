@@ -43,14 +43,14 @@ describe('Wallets', function () {
     })
 
     it('Create and get wallet object', () => {
-        let phone = getRandomInt(380000000000, 389999999999).toString();
+        let email = getRandomInt(0, 9999999) + '-test@test.com';
         let accountKeypair = StellarSdk.Keypair.random();
         let password = '12312x3';
 
         return WalletApi.create({
                 keypair: accountKeypair,
                 password: password,
-                phone: phone,
+                email: email,
             })
             .should.eventually.be.instanceof(wallet)
             .then((wallet)=> {
@@ -62,14 +62,14 @@ describe('Wallets', function () {
             })
             .then(() => {
                 return WalletApi.get({
-                    phone: phone,
+                    email: email,
                     password: password,
                 })
             })
             .should.eventually.be.instanceof(wallet);
     });
 
-    it('createTotp', function () {
+    it('Enable TOTP', function () {
         let phone = getRandomInt(380000000000, 389999999999).toString();
         let accountKeypair = StellarSdk.Keypair.random();
         let password = '12312x3';
@@ -82,4 +82,22 @@ describe('Wallets', function () {
             return wallet.enableTotp();
         })
     })
+
+    // it('sendSms', function () {
+    //     return WalletApi.get({
+    //         password: '123123',
+    //         phone: '+xxxxxxx',
+    //         sms_code: 922224
+    //     }).catch(err => {
+    //         console.log(err)
+    //         throw new Error(err)
+    //     })
+    //
+    //     return WalletApi.sendSms({
+    //         password: '123123',
+    //         phone: '+xxxxxxx',
+    //     }).then(resp => {
+    //         console.log(resp)
+    //     })
+    // })
 });

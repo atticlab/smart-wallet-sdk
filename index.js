@@ -12,6 +12,7 @@ const nacl = require('tweetnacl');
 const sjcl = require('sjcl');
 const Wallet = require('./wallet');
 const crypto = require('./crypto');
+const errors = require('./errors');
 const bad_passwords = require('./bad_passwords');
 
 const EVENT_PROCESS = 'process';
@@ -53,8 +54,11 @@ module.exports = class extends EventEmitter {
         self.axios.interceptors.response.use(function (response) {
             return response.data;
         }, function (error) {
-            // TODO: error handling
-            return Promise.reject(error);
+            if (error.response && error.response.data) {
+                return Promise.reject(errors.getProtocolError(error.response.data.error, error.response.data.message || ''));
+            }
+
+            return Promise.reject(new errors.ConnectionError());
         });
     }
 
@@ -159,6 +163,20 @@ module.exports = class extends EventEmitter {
     }
 
     getData(params) {
+        var self = this;
+
+        if (!_.isObject(params)) {
+            throw new Error('params is not an object');
+        }
+
+        if (_.isEmpty(params.phone) && _.isEmpty(params.email)) {
+            throw new Error('both phone and email cannot be empty');
+        }
+
+        if (_.isEmpty(params.password)) {
+            throw new Error('password is empty');
+        }
+
         this.emit(EVENT_PROCESS, {
             func: 'getData',
         });
@@ -171,20 +189,6 @@ module.exports = class extends EventEmitter {
 
                 return Promise.resolve(params);
             })
-    }
-
-    get(params) {
-        var self = this;
-
-        if (!_.isObject(params)) {
-            throw new Error('params is not an object');
-        }
-
-        if (_.isEmpty(params.phone) && _.isEmpty(params.email)) {
-            throw new Error('both phone and email cannot be empty');
-        }
-
-        return this.getData(params)
             .then(params => {
                 return crypto.calculatePassword(params, (roundsDone) => {
                     self.emit(EVENT_PROCESS, {
@@ -200,6 +204,12 @@ module.exports = class extends EventEmitter {
 
                 return crypto.calculateMasterKey(params); //S0
             })
+    }
+
+    get(params) {
+        var self = this;
+
+        return this.getData(params)
             .then(params => {
                 let raw_wallet_id = crypto.deriveWalletId(params.raw_master_key);
                 let raw_wallet_key = crypto.deriveWalletKey(params.raw_master_key);
@@ -215,7 +225,8 @@ module.exports = class extends EventEmitter {
                 return self.axios.post('/wallets/get', _.pick(params, [
                         'account_id',
                         'wallet_id',
-                        'tfa_code'
+                        'totp_code',
+                        'sms_code'
                     ]))
                     .then(function (resp) {
                         params.keychain_data = resp.keychain_data;
@@ -259,5 +270,21 @@ module.exports = class extends EventEmitter {
         ])).then(() => {
             return Promise.resolve(true);
         });
+    }
+
+    sendSms(params) {
+        var self = this;
+
+        return this.getData(params)
+            .then(params => {
+                let raw_wallet_id = crypto.deriveWalletId(params.raw_master_key);
+                params.wallet_id = sjcl.codec.base64.fromBits(raw_wallet_id);
+
+                // Send request
+                return self.axios.post('/auth/sendSms', _.pick(params, [
+                    'account_id',
+                    'wallet_id',
+                ]));
+            })
     }
 }
