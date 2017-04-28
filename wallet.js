@@ -21,6 +21,7 @@ class Wallet {
             'seed',
             'phone',
             'email',
+            'is_totp_enabled'
         ];
 
         _.each(properties, function (param) {
@@ -41,6 +42,35 @@ class Wallet {
                     nonce: nonce,
                     signature: this.sign(nonce),
                 });
+            })
+    }
+
+    activateTotp(code) {
+        var self = this;
+
+        if (_.isUndefined(code)) {
+            throw new TypeError('code is not isset.');
+        }
+
+        return this.api.axios.post('/auth/activateTotp', {
+            account_id: this.account_id,
+            totp_code: code
+        }).then(() => {
+            self.is_totp_enabled = true;
+        })
+    }
+
+    disableTotp() {
+        var self = this;
+
+        return this.getNonce()
+            .then(nonce => {
+                return this.api.axios.post('/auth/disableTotp', {
+                    nonce: nonce,
+                    signature: this.sign(nonce),
+                });
+            }).then(() => {
+                self.is_totp_enabled = false;
             })
     }
 

@@ -40,8 +40,18 @@ WalletApi.get({
 ```
 
 ## `Wallet methods`
-#### `Enable two-factor auth using totp`
+#### `Two-factor auth using totp`
 Returns secret key to paste into your google auth or freeotp app
 ```js
 wallet.enableTotp()
+```
+
+After you enabled top, you need to activate it
+```js
+wallet.activateTotp('code_from_app')
+```
+
+You can as well disable it
+```js
+wallet.disableTotp('code_from_app')
 ```

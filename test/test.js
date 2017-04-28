@@ -69,35 +69,39 @@ describe('Wallets', function () {
             .should.eventually.be.instanceof(wallet);
     });
 
-    it('Enable TOTP', function () {
+    it('Enable/Disable TOTP', function () {
         let phone = getRandomInt(380000000000, 389999999999).toString();
         let accountKeypair = StellarSdk.Keypair.random();
         let password = '12312x3';
 
+        var wallet;
         return WalletApi.create({
             keypair: accountKeypair,
             password: password,
             phone: phone,
-        }).then(wallet => {
+        }).then(w => {
+            wallet = w;
             return wallet.enableTotp();
+        }).then(() => {
+            return wallet.disableTotp();
         })
     })
 
-    // it('sendSms', function () {
-    //     return WalletApi.get({
-    //         password: '123123',
-    //         phone: '+xxxxxxx',
-    //         sms_code: 922224
-    //     }).catch(err => {
-    //         console.log(err)
-    //         throw new Error(err)
-    //     })
-    //
-    //     return WalletApi.sendSms({
-    //         password: '123123',
-    //         phone: '+xxxxxxx',
-    //     }).then(resp => {
-    //         console.log(resp)
-    //     })
-    // })
+    it('sendSms', function () {
+        return WalletApi.get({
+            password: '123123',
+            phone: '+xxxxxxx',
+            sms_code: 922224
+        }).catch(err => {
+            console.log(err)
+            throw new Error(err)
+        })
+
+        return WalletApi.sendSms({
+            password: '123123',
+            phone: '+xxxxxxx',
+        }).then(resp => {
+            console.log(resp)
+        })
+    })
 });

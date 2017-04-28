@@ -244,6 +244,7 @@ module.exports = class extends EventEmitter {
                             'account_id',
                             'phone',
                             'email',
+                            'is_totp_enabled',
                         ]);
 
                         p.seed = crypto.decryptData(params.keychain_data, params.raw_wallet_key);

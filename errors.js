@@ -25,15 +25,18 @@ module.exports = {
         }
 
         switch (code) {
-            case 'ERR_SERVICE':
-            case 'ERR_NOT_FOUND':
-            case 'ERR_NOT_ALLOWED':
-            case 'ERR_ALREADY_EXISTS':
-            case 'ERR_BAD_PARAM':
-            case 'ERR_EMPTY_PARAM':
-            case 'ERR_NOT_ACTIVATED':
-            case 'ERR_TFA_AUTH':
-            case 'ERR_NO_PHONE':
+            case'ERR_SERVICE':
+            case'ERR_NOT_FOUND':
+            case'ERR_ALREADY_EXISTS':
+            case'ERR_BAD_PARAM':
+            case'ERR_EMPTY_PARAM':
+            case'ERR_NOT_ALLOWED':
+            case'ERR_TOTP_DISABLED':
+            case'ERR_BAD_SIGN':
+            case'ERR_SMS_LIMIT':
+            case'ERR_NO_PHONE':
+            case'ERR_TFA_TOTP':
+            case'ERR_TFA_SMS':
                 return new this.ApiError(code, msg);
 
             default:
