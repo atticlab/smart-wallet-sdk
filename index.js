@@ -232,6 +232,7 @@ module.exports = class extends EventEmitter {
                         params.keychain_data = resp.keychain_data;
                         params.email = resp.email;
                         params.phone = resp.phone;
+                        params.is_totp_enabled = resp.is_totp_enabled;
 
                         self.emit(EVENT_PROCESS, {
                             func: 'decryptWallet',
