@@ -13,22 +13,17 @@ nacl.util = require('tweetnacl-util');
 
 class Wallet {
     constructor(api, p) {
-        var self = this;
         var params = _.cloneDeep(p);
-        var properties = [
-            'wallet_id',
-            'account_id',
-            'seed',
-            'phone',
-            'email',
-            'is_totp_enabled'
-        ];
-
-        _.each(properties, function (param) {
-            self[param] = params[param];
-        });
 
         this.api = api;
+
+        this.wallet_id = params.wallet_id;
+        this.account_id = params.account_id;
+        this.seed = params.seed;
+        this.phone = params.phone;
+        this.email = params.email;
+        this.face_uuid = params.face_uuid;
+        this.is_totp_enable = params.is_totp_enable;
     }
 
     getNonce() {

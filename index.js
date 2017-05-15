@@ -82,8 +82,8 @@ module.exports = class extends EventEmitter {
             throw new Error('Insecure password');
         }
 
-        if (_.isEmpty(params.phone) && _.isEmpty(params.email)) {
-            throw new Error('both phone and email cannot be empty');
+        if (_.isEmpty(params.phone) && _.isEmpty(params.email) && _.isEmpty(params.face_uuid)) {
+            throw new Error('You need any of these keys for account: phone, email, face_uuid');
         }
 
         params.seed = params.keypair.seed();
@@ -125,16 +125,11 @@ module.exports = class extends EventEmitter {
                         'salt',
                         'kdf_params',
                         'phone',
-                        'email'
+                        'email',
+                        'face_uuid',
                     ]))
                     .then(() => {
-                        return Promise.resolve(new Wallet(self, _.pick(params, [
-                            'wallet_id',
-                            'account_id',
-                            'seed',
-                            'phone',
-                            'email',
-                        ])));
+                        return Promise.resolve(new Wallet(self, params));
                     })
             });
     }
@@ -169,8 +164,8 @@ module.exports = class extends EventEmitter {
             throw new Error('params is not an object');
         }
 
-        if (_.isEmpty(params.phone) && _.isEmpty(params.email)) {
-            throw new Error('both phone and email cannot be empty');
+        if (_.isEmpty(params.phone) && _.isEmpty(params.email) && _.isEmpty(params.face_uuid)) {
+            throw new Error('You need any of these keys for account: phone, email, face_uuid');
         }
 
         if (_.isEmpty(params.password)) {
@@ -181,13 +176,10 @@ module.exports = class extends EventEmitter {
             func: 'getData',
         });
 
-        return this.axios.post('/wallets/getdata', _.pick(params, ['email', 'phone']))
+        return this.axios.post('/wallets/getdata', _.pick(params, ['email', 'phone', 'face_uuid']))
             .then(function (resp) {
-                params.salt = resp.salt;
-                params.account_id = resp.account_id
-                params.kdf_params = resp.kdf_params;
-
-                return Promise.resolve(params);
+                var p = _.extend(resp, params);
+                return Promise.resolve(p);
             })
             .then(params => {
                 return crypto.calculatePassword(params, (roundsDone) => {
@@ -229,26 +221,12 @@ module.exports = class extends EventEmitter {
                         'sms_code'
                     ]))
                     .then(function (resp) {
-                        params.keychain_data = resp.keychain_data;
-                        params.email = resp.email;
-                        params.phone = resp.phone;
-                        params.is_totp_enabled = resp.is_totp_enabled;
-
                         self.emit(EVENT_PROCESS, {
                             func: 'decryptWallet',
                         });
 
-                        // Decrypt wallet
-                        var p = _.pick(params, [
-                            'wallet_id',
-                            'seed',
-                            'account_id',
-                            'phone',
-                            'email',
-                            'is_totp_enabled',
-                        ]);
-
-                        p.seed = crypto.decryptData(params.keychain_data, params.raw_wallet_key);
+                        var p = _.extend(resp, params);
+                        p.seed = crypto.decryptData(p.keychain_data, p.raw_wallet_key);
 
                         return Promise.resolve(new Wallet(self, p));
                     });
@@ -256,19 +234,18 @@ module.exports = class extends EventEmitter {
     }
 
     notExist(params) {
-        var self = this;
-
         if (!_.isObject(params)) {
             throw new Error('params is not an object');
         }
 
-        if (_.isEmpty(params.phone) && _.isEmpty(params.email)) {
-            throw new Error('both phone and email cannot be empty');
+        if (_.isEmpty(params.phone) && _.isEmpty(params.email) && _.isEmpty(params.face_uuid)) {
+            throw new Error('You need any of these keys for account: phone, email, face_uuid');
         }
 
         return this.axios.post('/wallets/notexist', _.pick(params, [
             'phone',
-            'email'
+            'email',
+            'face_uuid',
         ])).then(() => {
             return Promise.resolve(true);
         });
