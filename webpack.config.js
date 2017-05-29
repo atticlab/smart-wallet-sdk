@@ -4,6 +4,7 @@ module.exports = {
     entry: './index.js',
     output: {
         path: './dist/',
+        library: 'SmartWallet',
         filename: 'smart-wallet-sdk.js',
     },
     module: {
