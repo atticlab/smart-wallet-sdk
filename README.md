@@ -3,7 +3,7 @@
 **Create api object**
 
 ```js
-var api = require('smart-wallet-js');
+var api = require('smart-wallet-sdk');
 
 var WalletApi = new api({
     host: keyserver_host
