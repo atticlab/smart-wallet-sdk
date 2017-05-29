@@ -9,7 +9,7 @@ const sjcl = require('sjcl');
 
 require('sjcl-scrypt').extendSjcl(sjcl);
 
-class Helpers {
+class Crypto {
 
     calculatePassword(params, cb) {
         if (!params.kdf_params.password_algorithm || !params.kdf_params.password_rounds) {
@@ -132,4 +132,4 @@ class Helpers {
     }
 }
 
-module.exports = new Helpers
+module.exports = new Crypto
