@@ -15,7 +15,6 @@ const crypto = require('./crypto');
 const errors = require('./errors');
 const bad_passwords = require('./bad_passwords');
 
-const EVENT_PROCESS = 'process';
 var cached_kdf_params;
 
 module.exports = class extends EventEmitter {
@@ -40,7 +39,9 @@ module.exports = class extends EventEmitter {
         this.axios.defaults.baseURL = this.options.host.replace(/\/+$/g, '');
         this.axios.defaults.timeout = this.options.request_ttl * 1000;
         this.axios.defaults.paramsSerializer = function (params) {
-            return Qs.stringify(params, {arrayFormat: 'brackets'})
+            return Qs.stringify(params, {
+                arrayFormat: 'brackets'
+            })
         }
 
         this.axios.interceptors.request.use(function (config) {
@@ -92,31 +93,14 @@ module.exports = class extends EventEmitter {
 
         return Promise.resolve(params)
             .then(this.getKdfParams.bind(this))
-            .then(params => {
-                return crypto.calculatePassword(params, (roundsDone) => {
-                    self.emit(EVENT_PROCESS, {
-                        func: 'calculatePasswordProgress',
-                        progress: roundsDone,
-                    });
-                });
-            })
-            .then(params => {
-                self.emit(EVENT_PROCESS, {
-                    func: 'calculateMasterKey',
-                });
-
-                return crypto.calculateMasterKey(params); //S0
-            })
+            .then(this._hashPassword.bind(this))
+            .then(this._calculateMasterKey.bind(this))
             .then(params => {
                 let raw_wallet_id = crypto.deriveWalletId(params.raw_master_key);
                 let raw_wallet_key = crypto.deriveWalletKey(params.raw_master_key);
 
                 params.wallet_id = sjcl.codec.base64.fromBits(raw_wallet_id);
                 params.keychain_data = crypto.encryptData(params.seed, raw_wallet_key);
-
-                self.emit(EVENT_PROCESS, {
-                    func: 'walletsCreate',
-                });
 
                 return self.axios.post('/wallets/create', _.pick(params, [
                         'account_id',
@@ -144,10 +128,6 @@ module.exports = class extends EventEmitter {
             return Promise.resolve(params);
         }
 
-        this.emit(EVENT_PROCESS, {
-            func: 'getKdfParams',
-        });
-
         return this.axios.get('/index/getkdf')
             .then(function (resp) {
                 cached_kdf_params = resp;
@@ -168,34 +148,17 @@ module.exports = class extends EventEmitter {
             throw new Error('You need any of these keys for account: phone, email, face_uuid');
         }
 
-        if (_.isEmpty(params.password)) {
-            throw new Error('password is empty');
+        if (_.isEmpty(params.password) && _.isEmpty(params.password_hash)) {
+            throw new Error('You need to provide "password" or "password_hash"');
         }
-
-        this.emit(EVENT_PROCESS, {
-            func: 'getData',
-        });
 
         return this.axios.post('/wallets/getdata', _.pick(params, ['email', 'phone', 'face_uuid']))
             .then(function (resp) {
                 var p = _.extend(resp, params);
                 return Promise.resolve(p);
             })
-            .then(params => {
-                return crypto.calculatePassword(params, (roundsDone) => {
-                    self.emit(EVENT_PROCESS, {
-                        func: 'calculatePasswordProgress',
-                        progress: roundsDone,
-                    });
-                });
-            })
-            .then(params => {
-                self.emit(EVENT_PROCESS, {
-                    func: 'calculateMasterKey',
-                });
-
-                return crypto.calculateMasterKey(params); //S0
-            })
+            .then(this._hashPassword.bind(this))
+            .then(this._calculateMasterKey.bind(this));
     }
 
     get(params) {
@@ -209,10 +172,6 @@ module.exports = class extends EventEmitter {
                 params.wallet_id = sjcl.codec.base64.fromBits(raw_wallet_id);
                 params.raw_wallet_key = raw_wallet_key;
 
-                self.emit(EVENT_PROCESS, {
-                    func: 'walletsGet',
-                });
-
                 // Send request
                 return self.axios.post('/wallets/get', _.pick(params, [
                         'account_id',
@@ -221,10 +180,6 @@ module.exports = class extends EventEmitter {
                         'sms_code'
                     ]))
                     .then(function (resp) {
-                        self.emit(EVENT_PROCESS, {
-                            func: 'decryptWallet',
-                        });
-
                         var p = _.extend(resp, params);
                         p.seed = crypto.decryptData(p.keychain_data, p.raw_wallet_key);
 
@@ -233,7 +188,7 @@ module.exports = class extends EventEmitter {
             })
     }
 
-    notExist(params) {
+    exists(params) {
         if (!_.isObject(params)) {
             throw new Error('params is not an object');
         }
@@ -242,13 +197,11 @@ module.exports = class extends EventEmitter {
             throw new Error('You need any of these keys for account: phone, email, face_uuid');
         }
 
-        return this.axios.post('/wallets/notexist', _.pick(params, [
+        return this.axios.post('/wallets/exists', _.pick(params, [
             'phone',
             'email',
             'face_uuid',
-        ])).then(() => {
-            return Promise.resolve(true);
-        });
+        ]));
     }
 
     sendSms(params) {
@@ -264,6 +217,53 @@ module.exports = class extends EventEmitter {
                     'account_id',
                     'wallet_id',
                 ]));
-            })
+            });
+    }
+
+    _hashPassword(params) {
+        var self = this;
+
+        if (!params.kdf_params.password_algorithm || !params.kdf_params.password_rounds) {
+            return Promise.resolve(params);
+        }
+
+        if (params.password_hash) {
+            return Promise.resolve(params);
+        }
+
+        var password = params.account_id + params.password + params.salt;
+
+        return crypto.cyclicHash(password, params.kdf_params.password_algorithm, params.kdf_params.password_rounds, (rounds_done) => {
+            self.emit('hashPasswordRound', params.kdf_params.password_rounds, rounds_done);
+        }).then(hash => {
+            hash = sjcl.codec.hex.fromBits(hash);
+
+            self.emit('hashPassword', hash);
+            params.password_hash = hash;
+
+            return Promise.resolve(params);
+        });
+    }
+
+    _calculateMasterKey(params) {
+        let salt = _.reduce([sjcl.codec.base64.toBits(params.salt), sjcl.codec.utf8String.toBits(params.username)], sjcl.bitArray.concat);
+
+        return crypto.scrypt(params.password_hash || params.password, salt, params.kdf_params).then(key => {
+            params.raw_master_key = key;
+
+            return Promise.resolve(params);
+        });
+    }
+
+    encryptData(data, key) {
+        key = crypto.hmacEncrypt(key, 'ENC_DATA')
+
+        return crypto.encryptData(data, key);
+    }
+
+    decryptData(data, key) {
+        key = crypto.hmacEncrypt(key, 'ENC_DATA')
+
+        return crypto.decryptData(data, key);
     }
 }

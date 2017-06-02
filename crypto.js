@@ -11,61 +11,48 @@ require('sjcl-scrypt').extendSjcl(sjcl);
 
 class Crypto {
 
-    calculatePassword(params, cb) {
-        if (!params.kdf_params.password_algorithm || !params.kdf_params.password_rounds) {
-            return Promise.resolve(params);
-        }
+    cyclicHash(key, algorithm, rounds, cb) {
+        return new Promise(resolve => {
+            var c = 0;
+            var iterations_per_round = Math.floor(rounds / 100) || rounds;
 
-        if (params.password_hash) {
-            return Promise.resolve(params);
-        }
-
-        var iterations_per_round = Math.floor(params.kdf_params.password_rounds / 100) || params.kdf_params.password_rounds;
-        var p = Promise.resolve(params);
-        var c = 0;
-
-        params.password_hash = params.account_id + params.password + params.salt;
-
-        for (var i = 0; i < params.kdf_params.password_rounds; i += iterations_per_round) {
-            p.then(params => {
+            var makeHash = function () {
                 for (var b = 0; b < iterations_per_round; b++) {
-                    params.password_hash = sjcl.hash[params.kdf_params.password_algorithm].hash(params.password_hash);
+                    c++
 
-                    c++;
-
-                    if (c >= params.kdf_params.password_rounds) {
-                        params.password_hash = sjcl.codec.hex.fromBits(params.password_hash);
+                    key = sjcl.hash[algorithm].hash(key);
+                    if (c >= rounds) {
                         break;
                     }
                 }
 
-                return new Promise(resolve => {
-                    setTimeout(() => {
-                        cb();
+                if (typeof cb == 'function') {
+                    cb(c);
+                }
 
-                        resolve(params)
-                    }, 100);
-                });
-            });
-        }
+                if (c >= rounds) {
+                    return resolve(key);
+                }
 
-        return p;
+                return setTimeout(makeHash, 10);
+            }
+
+            makeHash();
+        })
     }
 
-    calculateMasterKey(params) {
-        let password = params.password_hash || params.password;
-        let salt = _.reduce([sjcl.codec.base64.toBits(params.salt), sjcl.codec.utf8String.toBits(params.username)], sjcl.bitArray.concat);
-
+    scrypt(password, salt, kdf_params) {
         return new Promise(resolve => {
-            params.raw_master_key = sjcl.misc.scrypt(
+            var key = sjcl.misc.scrypt(
                 password,
                 sjcl.hash.sha256.hash(salt),
-                params.kdf_params.n,
-                params.kdf_params.r,
-                params.kdf_params.p,
-                params.kdf_params.bits / 8
+                kdf_params.n,
+                kdf_params.r,
+                kdf_params.p,
+                kdf_params.bits / 8
             );
-            resolve(params);
+
+            resolve(key);
         });
     }
 
@@ -77,14 +64,17 @@ class Crypto {
         return (new Buffer(str, 'base64')).toString();
     }
 
-    deriveWalletId(key) {
-        var hmac = new sjcl.misc.hmac(key, sjcl.hash.sha256);
-        return hmac.encrypt('WALLET_ID');
+    deriveWalletId(msg) {
+        return this.hmacEncrypt(msg, 'WALLET_ID');
     }
 
-    deriveWalletKey(key) {
-        var hmac = new sjcl.misc.hmac(key, sjcl.hash.sha256);
-        return hmac.encrypt('WALLET_KEY');
+    deriveWalletKey(msg) {
+        return this.hmacEncrypt(msg, 'WALLET_KEY');
+    }
+
+    hmacEncrypt(msg, key) {
+        var hmac = new sjcl.misc.hmac(msg, sjcl.hash.sha256);
+        return hmac.encrypt(key);
     }
 
     encryptData(data, key) {
@@ -116,15 +106,11 @@ class Crypto {
     decryptData(encryptedData, key) {
         let rawCipherText, rawIV, cipherName, modeName;
 
-        try {
-            let resultObject = JSON.parse(this.base64Decode(encryptedData));
-            rawIV = sjcl.codec.base64.toBits(resultObject.IV);
-            rawCipherText = sjcl.codec.base64.toBits(resultObject.cipherText);
-            cipherName = resultObject.cipherName;
-            modeName = resultObject.modeName;
-        } catch (e) {
-            new errors.DataCorrupt();
-        }
+        let resultObject = JSON.parse(this.base64Decode(encryptedData));
+        rawIV = sjcl.codec.base64.toBits(resultObject.IV);
+        rawCipherText = sjcl.codec.base64.toBits(resultObject.cipherText);
+        cipherName = resultObject.cipherName;
+        modeName = resultObject.modeName;
 
         let cipher = new sjcl.cipher[cipherName](key);
         let rawData = sjcl.mode[modeName].decrypt(cipher, rawCipherText, rawIV);

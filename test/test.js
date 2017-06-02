@@ -22,7 +22,7 @@ function getRandomInt(min, max) {
 
 describe('Wallets', function () {
     it('Check if username is free', function () {
-        return WalletApi.notExist({
+        return WalletApi.exists({
             email: 'debug@' + Date.now() + '.com',
         });
     });
@@ -87,21 +87,21 @@ describe('Wallets', function () {
         })
     })
 
-    it('sendSms', function () {
-        return WalletApi.get({
-            password: '123123',
-            phone: '+xxxxxxx',
-            sms_code: 922224
-        }).catch(err => {
-            console.log(err)
-            throw new Error(err)
-        })
+    // it('sendSms', function () {
+    //     return WalletApi.get({
+    //         password: '123123',
+    //         phone: '+xxxxxxx',
+    //         sms_code: 922224
+    //     }).catch(err => {
+    //         console.log(err)
+    //         throw new Error(err)
+    //     })
 
-        return WalletApi.sendSms({
-            password: '123123',
-            phone: '+xxxxxxx',
-        }).then(resp => {
-            console.log(resp)
-        })
-    })
+    //     return WalletApi.sendSms({
+    //         password: '123123',
+    //         phone: '+xxxxxxx',
+    //     }).then(resp => {
+    //         console.log(resp)
+    //     })
+    // })
 });
