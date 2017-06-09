@@ -14,6 +14,7 @@
   "dependencies": {
     "axios": "^0.16.1",
     "lodash": "^4.17.4",
+    "qs": "^6.4.0",
     "sjcl": "git+https://github.com/stellar/sjcl.git",
     "sjcl-scrypt": "git+https://github.com/stellar/sjcl-scrypt.git",
     "stellar-sdk": "git+https://github.com/atticlab/smart-sdk-js.git",
@@ -30,5 +31,7 @@
     "pre-commit": "^1.2.2",
     "webpack": "2.2.1"
   },
-  "pre-commit": ["build"]
+  "pre-commit": [
+    "build"
+  ]
 }

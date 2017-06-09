@@ -8,8 +8,7 @@ const StellarSdk = require('stellar-sdk');
 const _ = require('lodash');
 const sjcl = require('sjcl');
 const crypto = require('./crypto');
-const nacl = require('tweetnacl');
-nacl.util = require('tweetnacl-util');
+
 
 class Wallet {
     constructor(api, p) {
@@ -31,11 +30,13 @@ class Wallet {
     }
 
     enableTotp() {
+        var self = this;
+
         return this.getNonce()
             .then(nonce => {
-                return this.api.axios.post('/auth/enableTotp', {
+                return this.api.axios.post('/auth/enableTotp', {}, {
                     nonce: nonce,
-                    signature: this.sign(nonce),
+                    signRequest: self.sign.bind(this)
                 });
             })
     }
@@ -60,9 +61,9 @@ class Wallet {
 
         return this.getNonce()
             .then(nonce => {
-                return this.api.axios.post('/auth/disableTotp', {
+                return this.api.axios.post('/auth/disableTotp', {}, {
                     nonce: nonce,
-                    signature: this.sign(nonce),
+                    signRequest: self.sign.bind(this)
                 });
             }).then(() => {
                 self.is_totp_enabled = false;
@@ -75,8 +76,7 @@ class Wallet {
         }
 
         let keypair = StellarSdk.Keypair.fromSeed(this.seed)
-
-        return crypto.base64Encode(nacl.sign.detached(nacl.util.decodeUTF8(message), keypair._secretKey));
+        return crypto.signMessage(message, keypair._secretKey)
     }
 }
 

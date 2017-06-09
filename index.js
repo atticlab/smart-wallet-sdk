@@ -13,6 +13,7 @@ const sjcl = require('sjcl');
 const Wallet = require('./wallet');
 const crypto = require('./crypto');
 const errors = require('./errors');
+const qs = require('qs');
 const bad_passwords = require('./bad_passwords');
 
 var cached_kdf_params;
@@ -45,6 +46,27 @@ module.exports = class extends EventEmitter {
         }
 
         this.axios.interceptors.request.use(function (config) {
+            if (typeof config.signRequest == 'function') {
+                let nonce = typeof config.nonce != 'undefined' ? config.nonce : '';
+                let route = config.url.replace(/^(https?:)?(\/{2})?.*?(?=\/)/, '');
+                if (typeof config.params == 'object' && Object.keys(config.params).length) {
+                    route += (route.indexOf('?') === -1 ? '?' : '&') + qs.stringify(config.params, {
+                            encode: false,
+                            arrayFormat: 'brackets'
+                        });
+                }
+
+                let request_data = typeof config.data == 'object' ? JSON.stringify(config.data) : '';
+                let signature = config.signRequest(nonce + route + request_data)
+
+                if (typeof config.nonce != 'undefined') {
+                    config.headers['Nonce'] = nonce
+                }
+
+                config.headers['Signature'] = signature
+            }
+
+
             if (self.options.debug) {
                 config.headers['Debug'] = true;
             }
@@ -52,7 +74,7 @@ module.exports = class extends EventEmitter {
             return config;
         });
 
-        self.axios.interceptors.response.use(function (response) {
+        this.axios.interceptors.response.use(function (response) {
             return response.data;
         }, function (error) {
             if (error.response && error.response.data) {
@@ -137,6 +159,23 @@ module.exports = class extends EventEmitter {
             })
     }
 
+    getNonce(params) {
+        if (!_.isObject(params)) {
+            throw new Error('params is not an object');
+        }
+
+        if (_.isEmpty(params.account_id)) {
+            throw new Error('Params account_id is empty');
+        }
+
+        return this.axios.post('/auth/createnonce', _.pick(params, ['account_id']))
+            .then(function (resp) {
+                params.nonce = resp
+
+                return Promise.resolve(params);
+            });
+    }
+
     getData(params) {
         var self = this;
 
@@ -202,6 +241,59 @@ module.exports = class extends EventEmitter {
             'email',
             'face_uuid',
         ]));
+    }
+
+    setPassword(params) {
+        var self = this;
+
+        if (!_.isObject(params)) {
+            throw new Error('params is not an object');
+        }
+
+        if (!_.isString(params.password)) {
+            throw new Error('password is not set');
+        }
+
+        if (!params.keypair instanceof StellarSdk.Keypair) {
+            throw new Error('keypair must be an instanceof StellarSdk.Keypair');
+        }
+
+        // check bad password
+        if (bad_passwords.indexOf(params.password) > -1) {
+            throw new Error('Insecure password');
+        }
+
+        params.seed = params.keypair.seed();
+        params.account_id = params.keypair.accountId();
+        params.salt = crypto.base64Encode(nacl.randomBytes(16));
+
+        return Promise.resolve(params)
+            .then(this.getNonce.bind(this))
+            .then(this.getKdfParams.bind(this))
+            .then(this._hashPassword.bind(this))
+            .then(this._calculateMasterKey.bind(this))
+            .then(params => {
+                let raw_wallet_id = crypto.deriveWalletId(params.raw_master_key);
+                let raw_wallet_key = crypto.deriveWalletKey(params.raw_master_key);
+
+                params.wallet_id = sjcl.codec.base64.fromBits(raw_wallet_id);
+                params.keychain_data = crypto.encryptData(params.seed, raw_wallet_key);
+
+                return self.axios.post('/wallets/update', _.pick(params, [
+                        'wallet_id',
+                        'keychain_data',
+                        'salt',
+                        'kdf_params',
+                    ]), {
+                        nonce: params.nonce,
+                        signRequest: function (data) {
+                            return crypto.signMessage(data, params.keypair._secretKey);
+                        }
+                    })
+                    .then(() => {
+                        return Promise.resolve(new Wallet(self, params));
+                    })
+            });
     }
 
     sendSms(params) {

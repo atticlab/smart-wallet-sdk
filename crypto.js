@@ -6,6 +6,8 @@
 
 const _ = require('lodash');
 const sjcl = require('sjcl');
+const nacl = require('tweetnacl');
+nacl.util = require('tweetnacl-util');
 
 require('sjcl-scrypt').extendSjcl(sjcl);
 
@@ -115,6 +117,10 @@ class Crypto {
         let cipher = new sjcl.cipher[cipherName](key);
         let rawData = sjcl.mode[modeName].decrypt(cipher, rawCipherText, rawIV);
         return sjcl.codec.utf8String.fromBits(rawData);
+    }
+
+    signMessage(message, key) {
+        return this.base64Encode(nacl.sign.detached(nacl.util.decodeUTF8(message), key));
     }
 }
 

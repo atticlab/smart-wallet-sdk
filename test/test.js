@@ -87,6 +87,32 @@ describe('Wallets', function () {
         })
     })
 
+    it('Recover password', function () {
+        let email = 'debug@' + Date.now() + '.com';
+        let accountKeypair = StellarSdk.Keypair.random();
+        let password = '12312x3';
+        let new_password = '12312xxxxx3'
+
+        return WalletApi.create({
+                keypair: accountKeypair,
+                password: password,
+                email: email,
+            })
+            .then(wallet => {
+                return WalletApi.setPassword({
+                    keypair: accountKeypair,
+                    password: new_password
+                })
+            })
+            .then(() => {
+                return WalletApi.get({
+                    email: email,
+                    password: new_password
+                })
+            })
+            .should.eventually.be.instanceof(wallet)
+    });
+
     // it('sendSms', function () {
     //     return WalletApi.get({
     //         password: '123123',
