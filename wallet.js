@@ -22,7 +22,7 @@ class Wallet {
         this.phone = params.phone;
         this.email = params.email;
         this.face_uuid = params.face_uuid;
-        this.is_totp_enable = params.is_totp_enable;
+        this.is_totp_enabled = params.is_totp_enabled;
     }
 
     getNonce() {
